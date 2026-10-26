@@ -324,6 +324,31 @@
     .hero-grid>div{animation:none}
     .fact,.group,.review,.contact{transition:none}
   }
+
+  /* лента отзывов: листается сама */
+  .reviews-grid>*{min-width:0}
+  .carousel{position:relative;min-width:0}
+  .track{
+    display:flex;gap:16px;overflow-x:auto;position:relative;
+    scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  }
+  .track::-webkit-scrollbar{display:none}
+  .carousel .review{flex:0 0 100%;min-width:0;scroll-snap-align:start}
+  .carousel .review:hover{transform:none;box-shadow:none}
+  .dots{display:flex;gap:8px;margin-top:16px}
+  .dots[hidden]{display:none}
+  .dot{
+    position:relative;overflow:hidden;width:8px;height:8px;padding:0;border:0;border-radius:99px;
+    background:#d4d4cc;cursor:pointer;transition:width .35s,background .35s;
+  }
+  .dot.on{width:36px}
+  .dot.on::after{
+    content:"";position:absolute;inset:0;background:var(--ink);transform-origin:left;
+    animation:fill 6s linear forwards;
+  }
+  .carousel.paused .dot.on::after{animation-play-state:paused}
+  @keyframes fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @media(prefers-reduced-motion:reduce){.dot.on::after{animation:none}.dot.on{background:var(--ink)}}
 </style>
 </head>
 <body>
@@ -494,8 +519,9 @@
         </div>
 
         <div>
-          <div class="review-list">
-            <article class="review reveal">
+          <div class="carousel reveal" id="carousel">
+            <div class="review-list track">
+            <article class="review">
               <div class="review-top">
                 <div class="avatar">Н</div>
                 <div><strong>Николай Желонин</strong><small>Знаток города 4 уровня</small></div>
@@ -504,7 +530,7 @@
               <span class="stars">★★★★★</span>
               <p>Загнал робототизированный бокс, робот помыл машину минут за 20, в конце обработал воском и высушил ветродуйкой, но если моете машину зимой, то нужно пройтись самому тряпкой по резинкам</p>
             </article>
-            <article class="review reveal" style="--d:.1s">
+            <article class="review">
               <div class="review-top">
                 <div class="avatar">L</div>
                 <div><strong>LËLIK</strong><small>Знаток города 13 уровня</small></div>
@@ -513,6 +539,8 @@
               <span class="stars">★★★★★</span>
               <p>Работаем по безналу. Спецы в подвесках. Бывают нежданчики. Иногда очередь, иногда ждем запчасти. Иногда слесарей.</p>
             </article>
+            </div>
+            <div class="dots" role="group" aria-label="Отзывы"></div>
           </div>
           <a class="btn btn-line more" href="https://yandex.ru/maps/org/batyr/214620588430/reviews/?ll=72.557619%2C65.526422&z=16.11" target="_blank" rel="noopener">Все отзывы на Яндекс Картах →</a>
         </div>
@@ -592,6 +620,61 @@
     });
   },{rootMargin:'0px 0px -6% 0px',threshold:.06});
   els.forEach(function(e){io.observe(e)});
+})();
+</script>
+
+<script>
+(function(){
+  var car=document.getElementById('carousel');
+  if(!car)return;
+  var track=car.querySelector('.track'),slides=track.children,dots=car.querySelector('.dots');
+  var n=slides.length,cur=0,lock=false,t;
+  if(n<2){dots.hidden=true;return}
+  for(var i=0;i<n;i++){
+    var b=document.createElement('button');
+    b.type='button';b.className='dot';b.setAttribute('aria-label','Отзыв '+(i+1));
+    (function(i){b.addEventListener('click',function(){go(i)})})(i);
+    dots.appendChild(b);
+  }
+  function mark(i){
+    cur=i;
+    for(var k=0;k<n;k++){
+      var d=dots.children[k];
+      d.classList.remove('on');
+      if(k===i){void d.offsetWidth;d.classList.add('on')}
+    }
+  }
+  function go(i){
+    lock=true;clearTimeout(t);
+    track.scrollTo({left:slides[i].offsetLeft,behavior:'smooth'});
+    mark(i);
+    t=setTimeout(function(){lock=false},700);
+  }
+  track.addEventListener('scroll',function(){
+    if(lock)return;
+    clearTimeout(t);
+    t=setTimeout(function(){
+      var i=Math.round(track.scrollLeft/(slides[0].offsetWidth+16));
+      if(i!==cur)mark(i);
+    },80);
+  },{passive:true});
+  /* когда полоска заполнилась — следующий отзыв */
+  dots.addEventListener('animationend',function(e){
+    if(e.target.classList.contains('on'))go((cur+1)%n);
+  });
+  /* пауза при наведении, нажатии и когда лента не на экране */
+  var hold={hover:false,focus:false,hidden:true};
+  function sync(){car.classList.toggle('paused',hold.hover||hold.focus||hold.hidden)}
+  car.addEventListener('mouseenter',function(){hold.hover=true;sync()});
+  car.addEventListener('mouseleave',function(){hold.hover=false;sync()});
+  car.addEventListener('focusin',function(){hold.focus=true;sync()});
+  car.addEventListener('focusout',function(){hold.focus=false;sync()});
+  car.addEventListener('touchstart',function(){hold.hover=true;sync()},{passive:true});
+  car.addEventListener('touchend',function(){setTimeout(function(){hold.hover=false;sync()},1500)},{passive:true});
+  if('IntersectionObserver' in window){
+    new IntersectionObserver(function(l){hold.hidden=!l[0].isIntersecting;sync()},{threshold:.4}).observe(car);
+  }else{hold.hidden=false}
+  sync();mark(0);
 })();
 </script>
 </body>
